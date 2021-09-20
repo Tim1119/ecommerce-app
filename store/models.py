@@ -13,7 +13,7 @@ class Customer(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    price = models.FloatField()
+    price = models.DecimalField(max_digits=7,decimal_places=2)
     digital = models.BooleanField(default=False,null=True,blank=True)
     image = models.ImageField(default='placeholder.png',upload_to='product-images')
     created = models.DateTimeField(auto_now_add=True)
@@ -38,6 +38,16 @@ class Order(models.Model):
     date_ordered= models.DateTimeField(auto_now_add=True)
     complete = models.BooleanField(default=False)
     transaction_id = models.CharField(max_length=100,null=True)
+
+
+    @property
+    def shipping(self):
+        shipping = False 
+        orderItems = self.orderitem_set.all()
+        for i in orderItems:
+            if i.product.digital == False:
+                shipping = True 
+        return shipping
 
     @property
     def get_cart_total(self):
