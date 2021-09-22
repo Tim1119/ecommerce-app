@@ -116,7 +116,7 @@
         console.log('payment button clicked')
 
         let userFormData = {
-            'address': null,
+            'name': null,
             'email': null,
             'total': total,
         }
@@ -133,8 +133,8 @@
             shippingInfo.zipcode = form.zipcode.value
         }
         if (user == 'AnonymousUser') {
-            shippingInfo.name = form.name.value
-            shippingInfo.email = form.email.value
+            userFormData.name = form.name.value
+	    	userFormData.email = form.email.value
         }
         let url = '/process_order/'   
 	    	fetch(url, {

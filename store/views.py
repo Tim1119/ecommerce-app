@@ -4,7 +4,7 @@ from django.views.generic import ListView
 from .models import Customer, Order, Product,OrderItem, ShippingAddress
 from django.http import JsonResponse, request
 import json,datetime
-
+from .utils import cookieCart,cartData,guestOrder
 
 # Create your views here.
 class ProductListView(ListView):
@@ -13,23 +13,15 @@ class ProductListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+       
+        data= cartData(self.request)
+        cartItems =data['cartItems']
+       
+
         context['products'] = Product.objects.all()
-        if self.request.user.is_authenticated:
-            customer = self.request.user.customer
-            order,created = Order.objects.get_or_create(customer=customer,complete=False)
-            items= order.orderitem_set.all()
-            cartItems = order.get_cart_items
-            context['items'] = items
-            context['order'] = order
-            context['cartItems'] = cartItems
-            return context
-        else:
-            order = {'get_cart_items':0,'get_cart_total':0,'shipping':False}
-            cartItems = order['get_cart_items']
-            context['items'] = []
-            context['order'] = order
-            context['cartItems'] = cartItems
-            return context 
+        context['cartItems'] = cartItems
+        return context
+       
 
 class CartListView(ListView):
     model = Order
@@ -37,52 +29,16 @@ class CartListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.user.is_authenticated:
-            customer = self.request.user.customer
-            order,created = Order.objects.get_or_create(customer=customer,complete=False)
-            items= order.orderitem_set.all()
-            cartItems = order.get_cart_items
-            context['items'] = items
-            context['order'] = order
-            context['cartItems'] = cartItems
-            return context
-        else:
-            try:
-                cart =json.loads(self.request.COOKIES['cart'])
-                print(cart)
-            except:
-                cart={}
-            
-            order = {'get_cart_items':0,'get_cart_total':0,'shipping':False}
-            
-            
-            cartItems= order['get_cart_items']
+        data= cartData(self.request)
+        cartItems =data['cartItems']
+        order =data['order']
+        items =data['items']
 
-            for i in cart:
-                cartItems +=cart[i]['quantity']
-                
-                product = Product.objects.get(id=i)
-                total = (product.price * cart[i]['quantity'])
-                order['get_cart_total']+=total 
-                order['get_cart_items']+=cart[i]['quantity']
-                item={
-                    'product':{
-                        'id':product.id,
-                        'name':product.name,
-                        'price':product.price,
-                        'imageURL':product.imageURL
-                    },
-                    'quantity':cart[i] ['quantity'],
-                    'get_total':total,
-                }
-                items =[].append(item)
-
-
-            context['cartItems'] = cartItems
-            context['items'] = items
-            context['order'] = order
+        context['cartItems'] = cartItems
+        context['items'] = items
+        context['order'] = order
             
-            return context
+        return context
 
 
 class CheckoutListView(ListView):
@@ -91,20 +47,15 @@ class CheckoutListView(ListView):
    
    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.user.is_authenticated:
-            customer = self.request.user.customer
-            order,created = Order.objects.get_or_create(customer=customer,complete=False)
-            items= order.orderitem_set.all()
-            context['items'] = items
-            context['order'] = order
-            context['cartItems'] = order.get_cart_items
-            return context
-        else:
-            order = {'get_cart_items':0,'get_cart_total':0,'shipping':False}
-            context['items'] = []
-            context['order'] = order
-            context['cartItems'] = order['get_cart_items']
-            return context
+        data= cartData(self.request)
+        cartItems =data['cartItems']
+        order =data['order']
+        items =data['items']
+
+        context['cartItems'] = cartItems
+        context['items'] = items
+        context['order'] = order
+        return context
 
 def homeview(request):
     return render(request,'store/store.html')
@@ -137,6 +88,10 @@ def processOrder(request):
     if request.user.is_authenticated:
         customer = request.user.customer 
         order,created= Order.objects.get_or_create(customer,complete=False)
+       
+    else:
+        customer,order = guestOrder(request,data)
+       
         total=float(data['form']['total'])
         order.transaction_id = transaction_id  
 
@@ -146,16 +101,15 @@ def processOrder(request):
 
         if order.shipping == True:
             ShippingAddress.objects.create(
-                customer = customer,
-                order =order,
-                address = data['shipping']['address'],
-                city =  data['shipping']['city'],
-                state =  data['shipping']['state'],
-                zipcode =  data['shipping']['zipcode'],
-            )
+            customer = customer,
+            order =order,
+            address = data['shipping']['address'],
+            city =  data['shipping']['city'],
+            state =  data['shipping']['state'],
+            zipcode =  data['shipping']['zipcode'],
+        )
 
-    else:
-        print('user is not logged in')
+
     return JsonResponse('Payment Complete',safe=False)
 
     
